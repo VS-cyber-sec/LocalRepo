@@ -1,0 +1,37 @@
+!pip install mpi4py
+ 
+step 2
+%%writefile quicksort_mpi.py
+from mpi4py import MPI
+import numpy as np
+
+def quicksort(arr):
+    if len(arr) <= 1:
+        return arr
+    pivot = arr[len(arr)//2]
+    left = arr[arr < pivot]
+    mid = arr[arr == pivot]
+    right = arr[arr > pivot]
+    return np.concatenate([quicksort(left), mid, quicksort(right)])
+
+comm = MPI.COMM_WORLD   #Communication channel between all processes
+rank = comm.Get_rank()  #This process's unique ID
+size = comm.Get_size()  #Total number of processes
+
+if rank == 0:
+    data = np.array([64, 34, 25, 12, 22, 11, 90], dtype='i')
+    chunks = np.array_split(data, size)
+else:
+    chunks = None
+
+local_data = comm.scatter(chunks, root=0)   #dustribute data
+local_sorted = quicksort(local_data)
+gathered = comm.gather(local_sorted, root=0)
+
+if rank == 0:
+    result = quicksort(np.concatenate(gathered))
+    print("Sorted array:", result)
+
+ stp 3
+
+!mpirun --allow-run-as-root --oversubscribe -n 4 python quicksort_mpi.py
